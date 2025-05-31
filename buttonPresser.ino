@@ -223,13 +223,13 @@ struct ServoConfig {
   int angleMax = 188;
   int pwmMin = 500;
   int pwmMax = 2500;
-  int normalPos = 115;
-  int pressPos = 87;
+  int normalPos = 87;
+  int pressPos = 130;
 };
 
 struct LoopConfig {
   int interval = 21600;
-  int pressDuration = 100;
+  int pressDuration = 300;
 };
 
 String apiUrl = "";
@@ -364,6 +364,7 @@ void saveLoopConfig() {
 }
 
 bool tryConnectToWiFi() {
+  currentState = STATE_WIFI_FAIL;
   String ssid = readStringFromEEPROM(SSID_ADDR, 32);
   String pass = readStringFromEEPROM(PASS_ADDR, 64);
 
