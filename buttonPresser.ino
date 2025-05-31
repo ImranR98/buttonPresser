@@ -1,4 +1,5 @@
 #include <WiFi.h>
+#include <WiFiClientSecure.h>
 #include <EEPROM.h>
 #include <WebServer.h>
 #include <ArduinoJson.h>
@@ -237,7 +238,6 @@ unsigned long lastApiCall = 0;
 unsigned long lastLoopPress = 0;
 unsigned long lastStatusUpdate = 0;
 bool isInAPMode = false;
-bool lastApiSuccess = false;
 
 ServoConfig servoConfig;
 LoopConfig loopConfig;
@@ -465,20 +465,36 @@ void handleScheduledPresses() {
 }
 
 void fetchAndParseApi() {
-  WiFiClient client;
-  HTTPClient http;
+  static WiFiClient normalClient;
+  static WiFiClientSecure secureClient;
+  HTTPClient http;  // Declare HTTPClient inside the function
 
-  http.begin(client, apiUrl);
-  int httpCode = http.GET();
+  bool isHttps = apiUrl.startsWith("https://");
+  bool httpBeginSuccess = false;
 
-  if (httpCode == HTTP_CODE_OK) {
-    String payload = http.getString();
-    processJsonCommand(payload);
+  if (isHttps) {
+    secureClient.setInsecure(); // Skip certificate verification
+    httpBeginSuccess = http.begin(secureClient, apiUrl);
   } else {
-    Serial.printf("API request failed: %s\n", http.errorToString(httpCode).c_str());
+    httpBeginSuccess = http.begin(normalClient, apiUrl);
+  }
+
+  if (httpBeginSuccess) {
+    int httpCode = http.GET();
+
+    if (httpCode == HTTP_CODE_OK) {
+      String payload = http.getString();
+      processJsonCommand(payload);
+      currentState = STATE_ALL_OK;
+    } else {
+      Serial.printf("API request failed: %s\n", http.errorToString(httpCode).c_str());
+      currentState = STATE_API_FAIL;
+    }
+    http.end();
+  } else {
+    Serial.println("Failed to connect to API server");
     currentState = STATE_API_FAIL;
   }
-  http.end();
 }
 
 void processJsonCommand(String payload) {
